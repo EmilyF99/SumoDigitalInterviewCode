@@ -1,0 +1,3 @@
+﻿  MainGame.cpp
+E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(59,28): warning C4100: 'elapsedTime': unreferenced formal parameter
+  HelloWorld.vcxproj -> E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\Build\x64\Debug\HelloWorld.exe
