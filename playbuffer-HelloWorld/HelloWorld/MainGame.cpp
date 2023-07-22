@@ -1,11 +1,27 @@
 #define PLAY_IMPLEMENTATION
 #define PLAY_USING_GAMEOBJECT_MANAGER
 #include "Play.h"
+#include <Windows.h>
 
 //Game Display Window Parameters
 int DISPLAY_WIDTH = 1280;
 int DISPLAY_HEIGHT = 720;
 int DISPLAY_SCALE = 1;
+
+bool gameStarted = false;
+bool isAudioPlaying = true;
+
+enum GameScreen
+{
+	STATE_START,
+	STATE_OPTIONS,
+	STATE_AUDIO,
+	STATE_CONTROLS,
+	STATE_MAIN_GAME,
+	STATE_GAME_OVER
+};
+
+GameScreen currentGameScreen = STATE_START;
 
 enum Agent8State
 {
@@ -19,6 +35,7 @@ enum Agent8State
 struct GameState
 {
 	int score = 0;
+	int lives = 0;
 	Agent8State agentState = STATE_APPEAR;
 };
 
@@ -46,6 +63,8 @@ void UpdateCoinsAndStars();
 void UpdateLasers();
 void UpdateDestroyed();
 void UpdateAgent8();
+void DrawStartScreen();
+void DrawGameOverScreen();
 
 // The entry point for a PlayBuffer program used instead of Main
 void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
@@ -54,38 +73,87 @@ void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
 	Play::CreateManager( DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_SCALE );
 	//Moves local origins to centre
 	Play::CentreAllSpriteOrigins();
-	
 	Play::LoadBackground("Data\\Backgrounds\\background.png");
-	Play::StartAudioLoop("music");
 
-	//Creates Player Object, inital position, collision and what sprite to use
-	Play::CreateGameObject(TYPE_AGENT8, { 115, 0 }, 50, "agent8");
-
-	//Creates Fan Object, inital position, no collision, and sprite name
-	int id_fan = Play::CreateGameObject(TYPE_FAN, { 1140, 217 }, 0, "fan");
-
-	Play::GetGameObject(id_fan).velocity = { 0, 3 };
-	Play::GetGameObject(id_fan).animSpeed = 1.0f;
+	
+	
+	currentGameScreen = STATE_START;
 }
 
 // Called by PlayBuffer every frame (60 times a second!)
 bool MainGameUpdate( float elapsedTime )
 {
-	//Draws are added in layers, so background must be first.
-	Play::DrawBackground();
-	UpdateAgent8(); // Replaces HandlePlayerControls() in MainGameUpdate(
-	UpdateFan();
-	UpdateTools();
-	UpdateCoinsAndStars();
-	UpdateLasers();
-	UpdateDestroyed();
-	Play::DrawFontText("64px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
-		{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 30 }, Play::CENTRE);
-	Play::DrawFontText("132px", "SCORE: " + std::to_string(gameState.score),
-		{ DISPLAY_WIDTH / 2, 50 }, Play::CENTRE);
-	//Displays current Drawings on Screen
-	Play::PresentDrawingBuffer();
-	return Play::KeyDown( VK_ESCAPE );
+	switch (currentGameScreen)
+	{
+	case STATE_START:
+		//Method
+		DrawStartScreen();
+		if (Play::KeyDown(VK_SPACE)) {
+			currentGameScreen = STATE_MAIN_GAME;
+		}
+		return Play::KeyDown(VK_ESCAPE);
+		break;
+
+	case STATE_MAIN_GAME:
+		if (!gameStarted) {
+			// The game has just started, do the initialization here.
+			Play::CentreAllSpriteOrigins();
+			Play::LoadBackground("Data\\Backgrounds\\background.png");
+
+			if (isAudioPlaying) {
+				Play::StartAudioLoop("music");
+			}
+	
+			Play::CreateGameObject(TYPE_AGENT8, { 115, 0 }, 50, "agent8");
+			int id_fan = Play::CreateGameObject(TYPE_FAN, { 1140, 217 }, 0, "fan");
+			Play::GetGameObject(id_fan).velocity = { 0, 3 };
+			Play::GetGameObject(id_fan).animSpeed = 1.0f;
+
+			// Set the gameStarted to true so this initialization won't run again.
+			gameStarted = true;
+		}
+
+		//Added in Layers so Background Must be drawn first
+		gameState.lives = 3;
+		Play::DrawBackground();
+		UpdateAgent8(); // Replaces HandlePlayerControls() in MainGameUpdate(
+		UpdateFan();
+		UpdateTools();
+		UpdateCoinsAndStars();
+		UpdateLasers();
+		UpdateDestroyed();
+		Play::DrawFontText("64px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
+			{ DISPLAY_WIDTH / 2, 30 }, Play::CENTRE);
+		Play::DrawFontText("64px", "TOGGLE M TO MUTE / UNMUTE",
+			{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 30 }, Play::CENTRE);
+		Play::DrawFontText("64px", "SCORE: " + std::to_string(gameState.score),
+			{ 100, 50 }, Play::CENTRE);
+		Play::DrawFontText("64px", "Lives: " + std::to_string(gameState.lives), { 100, 100 }, Play::CENTRE);
+		//Displays current Drawings on Screen
+		Play::PresentDrawingBuffer();
+
+		if (Play::KeyPressed('M')) {
+			if (isAudioPlaying) {
+				Play::StopAudioLoop("music");
+			}
+			else {
+				Play::PlayAudio("music");
+			}
+			isAudioPlaying = !isAudioPlaying;
+		}
+		return Play::KeyDown(VK_ESCAPE);
+		break;
+	case STATE_GAME_OVER:
+		//Method 
+		DrawGameOverScreen();
+		if (Play::KeyPressed(VK_SPACE))
+		{
+			currentGameScreen = STATE_START;
+	
+		}
+		break;
+	}
+
 }
 
 // Gets called once when the player quits the game 
@@ -383,7 +451,11 @@ void UpdateAgent8()
 			obj_agent8.pos = { 115, 0 };
 			obj_agent8.velocity = { 0, 0 };
 			obj_agent8.frame = 0;
-			Play::StartAudioLoop("music");
+
+			if (isAudioPlaying) {
+				Play::StartAudioLoop("music");
+			}
+			
 			gameState.score = 0;
 			for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
 				Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
@@ -395,4 +467,31 @@ void UpdateAgent8()
 		obj_agent8.pos = obj_agent8.oldPos;
 	Play::DrawLine({ obj_agent8.pos.x, 0 }, obj_agent8.pos, Play::cWhite);
 	Play::DrawObjectRotated(obj_agent8);
+}
+
+//Not Used at the Minute
+void DrawScaledSprite(int spriteID, Point2D pos, int frameIndex) {
+	int newWidth = Play::GetSpriteWidth(spriteID) / 2;
+	int newHeight = Play::GetSpriteHeight(spriteID) / 2;
+
+	pos.x + (Play::GetSpriteWidth(spriteID) - newWidth) / 2;
+	pos.y + (Play::GetSpriteHeight(spriteID) - newHeight) / 2;
+
+	Play::DrawSprite(spriteID, pos, frameIndex);
+
+}
+
+void DrawStartScreen() {
+	Play::ClearDrawingBuffer(Play::cBlack);
+	Play::DrawFontText("64px", "HIT SPACE TO START GAME",
+		{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 100 }, Play::CENTRE);
+	//Play::DrawFontText("64px", "HIT O FOR OPTIONS", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 50 }, Play::CENTRE);
+	Play::PresentDrawingBuffer();
+	
+}
+
+void DrawGameOverScreen() {
+	Play::ClearDrawingBuffer(Play::cBlack);
+	Play::DrawFontText("64px", "Game Over",{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 100 }, Play::CENTRE);
+
 }

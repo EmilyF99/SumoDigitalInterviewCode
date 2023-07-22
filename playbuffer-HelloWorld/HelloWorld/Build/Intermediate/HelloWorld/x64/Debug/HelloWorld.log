@@ -1,3 +1,6 @@
 ﻿  MainGame.cpp
-E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(72,28): warning C4100: 'elapsedTime': unreferenced formal parameter
+E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(84,28): warning C4100: 'elapsedTime': unreferenced formal parameter
+E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(477,8): warning C4552: '+': result of expression not used
+E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(478,8): warning C4552: '+': result of expression not used
+E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\MainGame.cpp(157): warning C4715: 'MainGameUpdate': not all control paths return a value
   HelloWorld.vcxproj -> E:\Downloads\playbuffer-HelloWorld\playbuffer-HelloWorld\HelloWorld\Build\x64\Debug\HelloWorld.exe
