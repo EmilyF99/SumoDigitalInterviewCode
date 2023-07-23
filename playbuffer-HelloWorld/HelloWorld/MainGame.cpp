@@ -10,6 +10,18 @@ int DISPLAY_SCALE = 1;
 
 bool gameStarted = false;
 bool isAudioPlaying = true;
+bool extraLifeText = false;
+float extraLifeTextTimer = 0.0f;
+bool bonusRoundText = false;
+float bonusRoundTimer = 0.0f;
+bool invinciblityFrames = false;
+float invincibilityTimer = 0.0f;
+
+const float EXTRA_LIFE_TEXT_DISPLAY_TIME = 2.5f;
+const float BONUS_ROUND_TIME = 6.0F;
+const float INVINCIBILITY_TIME = 2.5F;
+
+std::vector<int> vBonusRoundObjectsIDs;
 
 enum GameScreen
 {
@@ -34,8 +46,10 @@ enum Agent8State
 //Struct for overall state of the game
 struct GameState
 {
-	int score = 0;
-	int lives = 0;
+	int score = 24999;
+	int lives = 3;
+	int scoreForNextLife = 10000;
+	int scoreForBonusRound = 25000;
 	Agent8State agentState = STATE_APPEAR;
 };
 
@@ -65,6 +79,10 @@ void UpdateDestroyed();
 void UpdateAgent8();
 void DrawStartScreen();
 void DrawGameOverScreen();
+void DrawExtraLifeText();
+void DrawBonusLevelText();
+void ResetGameState();
+void DestroyAllObjects();
 
 // The entry point for a PlayBuffer program used instead of Main
 void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
@@ -75,8 +93,6 @@ void MainGameEntry( PLAY_IGNORE_COMMAND_LINE )
 	Play::CentreAllSpriteOrigins();
 	Play::LoadBackground("Data\\Backgrounds\\background.png");
 
-	
-	
 	currentGameScreen = STATE_START;
 }
 
@@ -88,8 +104,11 @@ bool MainGameUpdate( float elapsedTime )
 	case STATE_START:
 		//Method
 		DrawStartScreen();
+
 		if (Play::KeyDown(VK_SPACE)) {
 			currentGameScreen = STATE_MAIN_GAME;
+			ResetGameState();
+			gameStarted = false;
 		}
 		return Play::KeyDown(VK_ESCAPE);
 		break;
@@ -114,7 +133,6 @@ bool MainGameUpdate( float elapsedTime )
 		}
 
 		//Added in Layers so Background Must be drawn first
-		gameState.lives = 3;
 		Play::DrawBackground();
 		UpdateAgent8(); // Replaces HandlePlayerControls() in MainGameUpdate(
 		UpdateFan();
@@ -122,6 +140,7 @@ bool MainGameUpdate( float elapsedTime )
 		UpdateCoinsAndStars();
 		UpdateLasers();
 		UpdateDestroyed();
+
 		Play::DrawFontText("64px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
 			{ DISPLAY_WIDTH / 2, 30 }, Play::CENTRE);
 		Play::DrawFontText("64px", "TOGGLE M TO MUTE / UNMUTE",
@@ -129,6 +148,32 @@ bool MainGameUpdate( float elapsedTime )
 		Play::DrawFontText("64px", "SCORE: " + std::to_string(gameState.score),
 			{ 100, 50 }, Play::CENTRE);
 		Play::DrawFontText("64px", "Lives: " + std::to_string(gameState.lives), { 100, 100 }, Play::CENTRE);
+
+		if (extraLifeText)
+		{
+			extraLifeTextTimer -= elapsedTime;
+			if (extraLifeTextTimer > 0.0f)
+			{
+				Play::DrawFontText("64px", "Extra Life!", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
+			}
+			else
+			{
+				extraLifeText = false;
+			}
+		}
+
+		if (bonusRoundText)
+		{
+			bonusRoundTimer -= elapsedTime;
+			if (bonusRoundTimer > 0.0f)
+			{
+				Play::DrawFontText("64px", "Bonus Round!", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
+			}
+			else 
+			{
+				bonusRoundText = false;
+			}
+		}
 		//Displays current Drawings on Screen
 		Play::PresentDrawingBuffer();
 
@@ -143,14 +188,18 @@ bool MainGameUpdate( float elapsedTime )
 		}
 		return Play::KeyDown(VK_ESCAPE);
 		break;
+
 	case STATE_GAME_OVER:
 		//Method 
 		DrawGameOverScreen();
 		if (Play::KeyPressed(VK_SPACE))
 		{
-			currentGameScreen = STATE_START;
-	
+			currentGameScreen = STATE_MAIN_GAME;
+			gameStarted = false;
+			ResetGameState();
+			DestroyAllObjects();
 		}
+		return Play::KeyDown(VK_ESCAPE);
 		break;
 	}
 
@@ -215,28 +264,39 @@ void UpdateFan()
 	//Roll of a 50 on a 50 dice
 	if (Play::RandomRoll(50) == 50)
 	{
-		//Creates a tool object for a Screwdriver
-		//Created at fans position, collision of 50 and driver sprite
-		int id = Play::CreateGameObject(TYPE_TOOL, obj_fan.pos, 50, "driver");
-		GameObject& obj_tool = Play::GetGameObject(id);
-		//Sets the direction of the tool and then times by 6 to set Y Axis Velocity
-		obj_tool.velocity = Point2f(-8, Play::RandomRollRange(-1, 1) * 6);
-
-		//Gives chance for tool to turn into spanner
-		if (Play::RandomRoll(2) == 1)
+		if (bonusRoundText)
 		{
-			Play::SetSprite(obj_tool, "spanner", 0);
-			//Updates the radius, speed and sets to rotate
-			obj_tool.radius = 100;
-			obj_tool.velocity.x = -4;
-			obj_tool.rotSpeed = 0.1f;
+			int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin_resize");
+			GameObject& obj_coin = Play::GetGameObject(id);
+			obj_coin.velocity = { -3, 0 };
+			obj_coin.rotSpeed = 0.1f;
+			Play::PlayAudio("collect");
 		}
-		//spawning sound
-		Play::PlayAudio("tool");
+		else {
+			//Creates a tool object for a Screwdriver
+		//Created at fans position, collision of 50 and driver sprite
+			int id = Play::CreateGameObject(TYPE_TOOL, obj_fan.pos, 50, "driver_resize");
+			GameObject& obj_tool = Play::GetGameObject(id);
+			//Sets the direction of the tool and then times by 6 to set Y Axis Velocity
+			obj_tool.velocity = Point2f(-8, Play::RandomRollRange(-1, 1) * 6);
+
+			//Gives chance for tool to turn into spanner
+			if (Play::RandomRoll(2) == 1)
+			{
+				Play::SetSprite(obj_tool, "spanner_resize", 0);
+				//Updates the radius, speed and sets to rotate
+				obj_tool.radius = 75;
+				obj_tool.velocity.x = -4;
+				obj_tool.rotSpeed = 0.1f;
+			}
+			//spawning sound
+			Play::PlayAudio("tool");
+		}
+	
 	}
 	if (Play::RandomRoll(150) == 1)
 	{
-		int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin");
+		int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin_resize");
 		GameObject& obj_coin = Play::GetGameObject(id);
 		obj_coin.velocity = { -3, 0 };
 		obj_coin.rotSpeed = 0.1f;
@@ -269,9 +329,28 @@ void UpdateTools()
 		{
 			Play::StopAudioLoop("music");
 			Play::PlayAudio("die");
-			//Hides rather than destroyed as needed for restart
-			gameState.agentState = STATE_DEAD;
+
+			gameState.lives--;
+
+			if (gameState.lives > 0)
+			{
+				gameState.agentState = STATE_APPEAR;
+				obj_agent8.pos = { 115, 0 };
+				obj_agent8.velocity = { 0, 0 };
+				obj_agent8.frame = 0;
+				
+			}
+
+			else 
+			{
+				Play::PlayAudio("explode");
+				gameState.agentState = STATE_DEAD;
+				currentGameScreen = STATE_GAME_OVER;
+				
+			}
+		
 		}
+
 		Play::UpdateGameObject(obj_tool);
 
 		//Checker for if object is leaving
@@ -326,6 +405,19 @@ void UpdateCoinsAndStars()
 			gameState.score += 500;
 			Play::PlayAudio("collect");
 		}
+
+		if (gameState.score >= gameState.scoreForNextLife)
+		{
+			gameState.scoreForNextLife += 10000; // Set the milestone for the next extra life
+			gameState.lives += 1;
+			DrawExtraLifeText();
+		}
+
+		if (gameState.score >= gameState.scoreForBonusRound) {
+			gameState.scoreForBonusRound += 25000;
+			DrawBonusLevelText();
+		}
+
 		//Update GameObjects and Position (Outside of IF)
 		Play::UpdateGameObject(obj_coin);
 		Play::DrawObjectRotated(obj_coin);
@@ -391,6 +483,10 @@ void UpdateLasers()
 		//Checker that stops game score dropping below 0
 		if (gameState.score < 0)
 			gameState.score = 0;
+		
+		if (gameState.lives <= 0) {
+			currentGameScreen = STATE_GAME_OVER;
+		}
 
 		Play::UpdateGameObject(obj_laser);
 		Play::DrawObject(obj_laser);
@@ -457,6 +553,7 @@ void UpdateAgent8()
 			}
 			
 			gameState.score = 0;
+	
 			for (int id_obj : Play::CollectGameObjectIDsByType(TYPE_TOOL))
 				Play::GetGameObject(id_obj).type = TYPE_DESTROYED;
 		}
@@ -493,5 +590,37 @@ void DrawStartScreen() {
 void DrawGameOverScreen() {
 	Play::ClearDrawingBuffer(Play::cBlack);
 	Play::DrawFontText("64px", "Game Over",{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 100 }, Play::CENTRE);
+	Play::DrawFontText("64px", "Press Space To Restart", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 50 }, Play::CENTRE);
+	Play::PresentDrawingBuffer();
+}
 
+void DrawExtraLifeText() {
+	extraLifeText = true;
+	Play::PlayAudio("lifeUp");
+	extraLifeTextTimer = EXTRA_LIFE_TEXT_DISPLAY_TIME;
+}
+
+void DrawBonusLevelText() {
+	bonusRoundText = true;
+	Play::PlayAudio("bonus");
+	bonusRoundTimer = BONUS_ROUND_TIME;
+}
+
+void ResetGameState() {
+	gameState.score = 0;
+	gameState.lives = 3; 
+	gameState.scoreForNextLife = 10000;
+	gameState.scoreForBonusRound = 25000;
+	gameState.agentState = STATE_APPEAR;
+}
+
+void DestroyAllObjects() {
+	
+	Play::DestroyGameObjectsByType(TYPE_AGENT8);
+	Play::DestroyGameObjectsByType(TYPE_FAN);
+	Play::DestroyGameObjectsByType(TYPE_TOOL);
+	Play::DestroyGameObjectsByType(TYPE_COIN);
+	Play::DestroyGameObjectsByType(TYPE_STAR);
+	Play::DestroyGameObjectsByType(TYPE_LASER);
+	Play::DestroyGameObjectsByType(TYPE_DESTROYED);
 }
