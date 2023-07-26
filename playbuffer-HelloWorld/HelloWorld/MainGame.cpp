@@ -8,18 +8,26 @@ int DISPLAY_WIDTH = 1280;
 int DISPLAY_HEIGHT = 720;
 int DISPLAY_SCALE = 1;
 
+//Globals 
+
 bool gameStarted = false;
 bool isAudioPlaying = true;
 bool extraLifeText = false;
 float extraLifeTextTimer = 0.0f;
 bool bonusRoundText = false;
 float bonusRoundTimer = 0.0f;
-bool invinciblityFrames = false;
+bool isPlayerInvincible = false;
 float invincibilityTimer = 0.0f;
+bool speedUpText = false;
+bool speedUpTextTimer = 0.0f;
 
+
+
+//Float Timers
 const float EXTRA_LIFE_TEXT_DISPLAY_TIME = 2.5f;
-const float BONUS_ROUND_TIME = 6.0F;
-const float INVINCIBILITY_TIME = 2.5F;
+const float BONUS_ROUND_TIME = 10.0F;
+const float INVINCIBILITY_TIME = 1.0F;
+
 
 std::vector<int> vBonusRoundObjectsIDs;
 
@@ -46,10 +54,11 @@ enum Agent8State
 //Struct for overall state of the game
 struct GameState
 {
-	int score = 24999;
+	int score = 0;
 	int lives = 3;
-	int scoreForNextLife = 10000;
-	int scoreForBonusRound = 25000;
+	int scoreForNextLife = 9000;
+	int scoreForBonusRound = 20000;
+	int gameTimer = 0;
 	Agent8State agentState = STATE_APPEAR;
 };
 
@@ -81,6 +90,7 @@ void DrawStartScreen();
 void DrawGameOverScreen();
 void DrawExtraLifeText();
 void DrawBonusLevelText();
+//void DrawSpeedUpText();
 void ResetGameState();
 void DestroyAllObjects();
 
@@ -101,12 +111,14 @@ bool MainGameUpdate( float elapsedTime )
 {
 	switch (currentGameScreen)
 	{
+	//First Screen that player sees
 	case STATE_START:
-		//Method
-		DrawStartScreen();
 
+		DrawStartScreen();
+		//Game Starts when player hits space
 		if (Play::KeyDown(VK_SPACE)) {
 			currentGameScreen = STATE_MAIN_GAME;
+			//Resets all game details, like score and lives
 			ResetGameState();
 			gameStarted = false;
 		}
@@ -141,62 +153,85 @@ bool MainGameUpdate( float elapsedTime )
 		UpdateLasers();
 		UpdateDestroyed();
 
+		//Play instructions and controls
 		Play::DrawFontText("64px", "ARROW KEYS TO MOVE UP AND DOWN AND SPACE TO FIRE",
 			{ DISPLAY_WIDTH / 2, 30 }, Play::CENTRE);
 		Play::DrawFontText("64px", "TOGGLE M TO MUTE / UNMUTE",
 			{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT - 30 }, Play::CENTRE);
+
+		//Life and score HUD
 		Play::DrawFontText("64px", "SCORE: " + std::to_string(gameState.score),
 			{ 100, 50 }, Play::CENTRE);
 		Play::DrawFontText("64px", "Lives: " + std::to_string(gameState.lives), { 100, 100 }, Play::CENTRE);
 
+		
+		//If the extra life boolean is true
 		if (extraLifeText)
 		{
+			//Start the timer for how long the text stays on screen
 			extraLifeTextTimer -= elapsedTime;
+			//If the timer is above 0
 			if (extraLifeTextTimer > 0.0f)
 			{
+				//Draw extra life text, middle of screen
 				Play::DrawFontText("64px", "Extra Life!", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
 			}
 			else
 			{
+				//else set boolean to false
 				extraLifeText = false;
 			}
 		}
 
+		//If the bonus round boolean is true
 		if (bonusRoundText)
 		{
+			//Start the timer for how long text stays on screen
 			bonusRoundTimer -= elapsedTime;
+			//If the timer is greater than 0
 			if (bonusRoundTimer > 0.0f)
 			{
+				//Draw Bonus Round text, middle of screen
 				Play::DrawFontText("64px", "Bonus Round!", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 }, Play::CENTRE);
 			}
 			else 
 			{
+				//else set boolean to false
 				bonusRoundText = false;
 			}
 		}
+		
 		//Displays current Drawings on Screen
 		Play::PresentDrawingBuffer();
 
+		//If the user presses M Stop and Start audio
 		if (Play::KeyPressed('M')) {
+			//If audio is already playing stop the audio
 			if (isAudioPlaying) {
 				Play::StopAudioLoop("music");
 			}
 			else {
+				//If audio is not playing then start the audio
 				Play::PlayAudio("music");
 			}
 			isAudioPlaying = !isAudioPlaying;
 		}
+
+
 		return Play::KeyDown(VK_ESCAPE);
 		break;
 
 	case STATE_GAME_OVER:
-		//Method 
+		//Draw the Game Over Screen, replaces current 
 		DrawGameOverScreen();
+		//If space is pressed retart the game
 		if (Play::KeyPressed(VK_SPACE))
 		{
 			currentGameScreen = STATE_MAIN_GAME;
 			gameStarted = false;
 			ResetGameState();
+			//All previous objects need to be destroyed before game can be restarted
+			//Other wise errors occur due to having duplicate objects. 
 			DestroyAllObjects();
 		}
 		return Play::KeyDown(VK_ESCAPE);
@@ -264,8 +299,10 @@ void UpdateFan()
 	//Roll of a 50 on a 50 dice
 	if (Play::RandomRoll(50) == 50)
 	{
+		//If the bonus round is showing if statement is called
 		if (bonusRoundText)
 		{
+			//All weapons are changed to coins for the bonuse round
 			int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin_resize");
 			GameObject& obj_coin = Play::GetGameObject(id);
 			obj_coin.velocity = { -3, 0 };
@@ -274,7 +311,7 @@ void UpdateFan()
 		}
 		else {
 			//Creates a tool object for a Screwdriver
-		//Created at fans position, collision of 50 and driver sprite
+			//Created at fans position, collision of 50 and driver sprite
 			int id = Play::CreateGameObject(TYPE_TOOL, obj_fan.pos, 50, "driver_resize");
 			GameObject& obj_tool = Play::GetGameObject(id);
 			//Sets the direction of the tool and then times by 6 to set Y Axis Velocity
@@ -294,6 +331,7 @@ void UpdateFan()
 		}
 	
 	}
+	//If roll successful, coin is generated rather than a tool
 	if (Play::RandomRoll(150) == 1)
 	{
 		int id = Play::CreateGameObject(TYPE_COIN, obj_fan.pos, 40, "coin_resize");
@@ -324,31 +362,34 @@ void UpdateTools()
 	for (int id : vTools)
 	{
 		GameObject& obj_tool = Play::GetGameObject(id);
-		//If Agent is Not Dead and there is collision
-		if (gameState.agentState != STATE_DEAD && Play::IsColliding(obj_tool, obj_agent8))
+		//If Agent is Not Dead and they are not currently in invincibility frames and there is a collision
+		if (gameState.agentState != STATE_DEAD && !isPlayerInvincible && Play::IsColliding(obj_tool, obj_agent8))
 		{
-			Play::StopAudioLoop("music");
 			Play::PlayAudio("die");
 
+			//Lives are reduced
 			gameState.lives--;
+			//Set invincibility frames to true and set invinciblity timer to the constant set earlier
+			isPlayerInvincible = true;
+			invincibilityTimer = INVINCIBILITY_TIME;
 
+
+			//If the player has move than 0 lives, position of agent resets
 			if (gameState.lives > 0)
 			{
 				gameState.agentState = STATE_APPEAR;
 				obj_agent8.pos = { 115, 0 };
 				obj_agent8.velocity = { 0, 0 };
 				obj_agent8.frame = 0;
-				
 			}
 
+			//If no lifes left, play explode sound and start game over screen
 			else 
 			{
 				Play::PlayAudio("explode");
 				gameState.agentState = STATE_DEAD;
 				currentGameScreen = STATE_GAME_OVER;
-				
 			}
-		
 		}
 
 		Play::UpdateGameObject(obj_tool);
@@ -364,9 +405,7 @@ void UpdateTools()
 		//If object is not in play then destory it 
 		if (!Play::IsVisible(obj_tool))
 			Play::DestroyGameObject(id);
-
 	}
-
 }
 
 //Used for collectables
@@ -406,15 +445,22 @@ void UpdateCoinsAndStars()
 			Play::PlayAudio("collect");
 		}
 
+		//If the current score is bigger than or equal to the next score needed for an extra life
 		if (gameState.score >= gameState.scoreForNextLife)
 		{
-			gameState.scoreForNextLife += 10000; // Set the milestone for the next extra life
+			//increase the score needed by 9000
+			//prevents the player from life farming by dropping below 8000 then back up to over 9000 on purpose
+			gameState.scoreForNextLife += 9000; 
+			//add one extra life
 			gameState.lives += 1;
+			//Draw the extra life text
 			DrawExtraLifeText();
 		}
 
+		//If current score is bigger or equal to the next score needed for the bonus round to start
 		if (gameState.score >= gameState.scoreForBonusRound) {
-			gameState.scoreForBonusRound += 25000;
+			//prevents the player from bonus level farming in same way as life farming
+			gameState.scoreForBonusRound += 20000;
 			DrawBonusLevelText();
 		}
 
@@ -477,7 +523,7 @@ void UpdateLasers()
 				hasCollided = true;
 				obj_coin.type = TYPE_DESTROYED;
 				Play::PlayAudio("error");
-				gameState.score -= 300;
+				gameState.score -= 200;
 			}
 		}
 		//Checker that stops game score dropping below 0
@@ -529,6 +575,7 @@ void UpdateAgent8()
 		obj_agent8.rotation = 0;
 		if (obj_agent8.pos.y >= DISPLAY_HEIGHT / 3)
 			gameState.agentState = STATE_PLAY;
+
 		break;
 	case STATE_HALT:
 		obj_agent8.velocity *= 0.9f;
@@ -537,10 +584,26 @@ void UpdateAgent8()
 		break;
 	case STATE_PLAY:
 		HandlePlayerControls();
+		
+		// If the player has just been hit
+		//Start timer
+		if (isPlayerInvincible)
+		{
+			//Timer linked to frames as a work around of not being able to pass elapsed timer 
+			invincibilityTimer -= 1.0f / 60.0f; 
+			if (invincibilityTimer <= 0.0f)
+			{
+				//Gets rid of invincibility frames
+				isPlayerInvincible = false; 
+			}
+		}
+	
 		break;
 	case STATE_DEAD:
 		obj_agent8.acceleration = { -0.3f , 0.5f };
 		obj_agent8.rotation += 0.25f;
+
+		//If spaceBar pressed game is restarted and score is set to 0
 		if (Play::KeyPressed(VK_SPACE) == true)
 		{
 			gameState.agentState = STATE_APPEAR;
@@ -559,6 +622,8 @@ void UpdateAgent8()
 		}
 		break;
 	} // End of switch on Agent8State
+
+
 	Play::UpdateGameObject(obj_agent8);
 	if (Play::IsLeavingDisplayArea(obj_agent8) && gameState.agentState != STATE_DEAD)
 		obj_agent8.pos = obj_agent8.oldPos;
@@ -566,56 +631,56 @@ void UpdateAgent8()
 	Play::DrawObjectRotated(obj_agent8);
 }
 
-//Not Used at the Minute
-void DrawScaledSprite(int spriteID, Point2D pos, int frameIndex) {
-	int newWidth = Play::GetSpriteWidth(spriteID) / 2;
-	int newHeight = Play::GetSpriteHeight(spriteID) / 2;
 
-	pos.x + (Play::GetSpriteWidth(spriteID) - newWidth) / 2;
-	pos.y + (Play::GetSpriteHeight(spriteID) - newHeight) / 2;
-
-	Play::DrawSprite(spriteID, pos, frameIndex);
-
-}
-
+//Used to draw the starting screen
 void DrawStartScreen() {
 	Play::ClearDrawingBuffer(Play::cBlack);
 	Play::DrawFontText("64px", "HIT SPACE TO START GAME",
 		{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 100 }, Play::CENTRE);
-	//Play::DrawFontText("64px", "HIT O FOR OPTIONS", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 50 }, Play::CENTRE);
+	Play::DrawFontText("64px", "Bonus Life Every: 9000 Points", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 30 }, Play::CENTRE);
+	Play::DrawFontText("64px", "Bonus Round Every: 20000 Points", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - -10 }, Play::CENTRE);
 	Play::PresentDrawingBuffer();
-	
 }
 
+//Used to draw the game over screen
 void DrawGameOverScreen() {
 	Play::ClearDrawingBuffer(Play::cBlack);
 	Play::DrawFontText("64px", "Game Over",{ DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 100 }, Play::CENTRE);
-	Play::DrawFontText("64px", "Press Space To Restart", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 50 }, Play::CENTRE);
+	Play::DrawFontText("64px", "Your Score: " + std::to_string(gameState.score), { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 50 }, Play::CENTRE);
+	Play::DrawFontText("64px", "Press Space To Restart", { DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2 - 5 }, Play::CENTRE);
 	Play::PresentDrawingBuffer();
 }
 
+//Sets boolean to true
+//Plays Extra Life Audio
+//Sets extra life timer to constant value
 void DrawExtraLifeText() {
 	extraLifeText = true;
 	Play::PlayAudio("lifeUp");
 	extraLifeTextTimer = EXTRA_LIFE_TEXT_DISPLAY_TIME;
 }
 
+//Sets boolean to true
+//Plays Bonus Round Audio
+//Sets Bonus Round to constant value
 void DrawBonusLevelText() {
 	bonusRoundText = true;
 	Play::PlayAudio("bonus");
 	bonusRoundTimer = BONUS_ROUND_TIME;
 }
 
+
+//Resets the game to initial starting values
 void ResetGameState() {
 	gameState.score = 0;
 	gameState.lives = 3; 
-	gameState.scoreForNextLife = 10000;
-	gameState.scoreForBonusRound = 25000;
+	gameState.scoreForNextLife = 8000;
+	gameState.scoreForBonusRound = 15000;
 	gameState.agentState = STATE_APPEAR;
 }
 
+//Used to ensure all objects are destroyed when game is restarted.
 void DestroyAllObjects() {
-	
 	Play::DestroyGameObjectsByType(TYPE_AGENT8);
 	Play::DestroyGameObjectsByType(TYPE_FAN);
 	Play::DestroyGameObjectsByType(TYPE_TOOL);
