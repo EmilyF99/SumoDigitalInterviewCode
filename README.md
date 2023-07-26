@@ -14,11 +14,12 @@ Completing the tutorial gives the developer a game that keeps track of a score, 
 - The player Can Press M to Mute the Game
 - Score was moved to the top left of the Screen
 - Start and Game Over Screen added
-- The player gets an extra life every 10,000 Points
-- The player gets and bonus round where only coins are spawned every 25,000 Points
-- Sprites Resized to make the game easier
+- The player gets an extra life every 8,000 Points
+- The player gets and bonus round where only coins are spawned every 20,000 Points
+- Sprites Resized to make the game have a better player experience
 - Lives implemented, the player starts with three lives
-- audio additions for extra life and bonus round
+- Audio additions for extra life and bonus round
+- Invincibility Frames Added
 
 ## Sources Used
 - Original Repository
