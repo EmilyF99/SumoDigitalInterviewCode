@@ -1,5 +1,5 @@
 # Sumo-Digital Interview Code Task
-![image](https://github.com/EmilyF99/SumoDigitalInterviewCode/assets/72047699/2296c115-5c91-4080-8e90-a33e0b49f5d3)
+![image](https://github.com/EmilyF99/SumoDigitalInterviewCode/blob/main/Screenshot%202023-07-23%20213013.png?raw=true)
 
 ## Skills Used
 ![C++](https://img.shields.io/badge/c++-%2300599C.svg?style=for-the-badge&logo=c%2B%2B&logoColor=white)
